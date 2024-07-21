@@ -1,0 +1,418 @@
+<!DOCTYPE HTML>
+
+<head>
+    <meta charset="utf8">
+
+</head>
+
+<body>
+    <script>
+        function buildTable(defaultClass = "bingocell", idPrefix = "", dataTable = undefined, actionOnClick = false) {
+            let bingoTableElement = document.createElement("table");
+            for (let row = 0; row < 5; row++) {
+                let bingoRowElement = document.createElement("tr");
+                for (let col = 0; col < 5; col++) {
+                    let bingoCellElement = document.createElement("td");
+                    if (typeof (dataTable) == "object") { //array is object, stupid
+                        // there could be further checks, I can't be bothered lol
+                        bingoCellElement.className = defaultClass + " color" + tilemap[row][col];
+                        if (dataTable[row][col] == 1) {
+                            bingoCellElement.innerText = "✓"
+                        }
+                    } else {
+                        bingoCellElement.className = defaultClass
+                    }
+                    if (idPrefix != "") {
+                        bingoCellElement.id = idPrefix + row + col
+                    }
+                    if (actionOnClick) {
+                        bingoCellElement.addEventListener("click", function () {
+                            console.log("clicked");
+                            selectCell(row, col);
+                        })
+                    }
+                    bingoRowElement.appendChild(bingoCellElement)
+                }
+                bingoTableElement.appendChild(bingoRowElement)
+            }
+            return bingoTableElement
+        }
+
+        let selectedColor = 0;
+        let tilemap = [
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+        ]
+        const ruleDescriptions = [
+            "A white tile has no rules attached to it.",
+            "A red tile has to have at least one tick in the 8 tiles around it.",
+            "A blue tile has to have at most two ticks in the 8 tiles around it.",
+            "A black tile has to be ticked.",
+            "A green tile's row and column must have the same number of ticks on them.",
+            "A yellow tile's two diagonal lines must have the same number of ticks on them, even if the two diagonals are of different length.",
+            "An orange tile has to have an even number of ticks (0 is also an even number) in the 8 tiles around it.",
+            "An purple tile has to have an odd number of ticks in the 8 tiles around it.",
+            "If a pink tile is ticked, then the 4 tiles directly adjacent to it must not be ticked.",
+            "If a cyan tile is ticked, then the 4 tiles directly adjacent to it must have at least one tick."
+        ]
+
+        function selectColor(num) {
+            document.getElementById("select-color-" + selectedColor).innerHTML = "";
+            selectedColor = num;
+            document.getElementById("select-color-" + num).innerHTML = "X";
+            document.getElementById("description").innerHTML = ruleDescriptions[num];
+        }
+
+        function selectCell(row, col) {
+            console.log("selectCell", row, col)
+            tilemap[row][col] = selectedColor;
+            updateTable()
+        }
+
+        function updateTable() {
+            for (let row = 0; row < 5; row++) {
+                for (let col = 0; col < 5; col++) {
+                    document.getElementById("maincell" + row + col).className = "bingocell color" + tilemap[row][col]
+                }
+            }
+        }
+
+        function checkFiveInARow(ticks) {
+            for (let row = 0; row < 5; row++) {
+                let tickCount = 0;
+                for (let col = 0; col < 5; col++) {
+                    tickCount += ticks[row][col];
+                }
+                if (tickCount == 5) {
+                    return true;
+                }
+            }
+            for (let col = 0; col < 5; col++) {
+                let tickCount = 0;
+                for (let row = 0; row < 5; row++) {
+                    tickCount += ticks[row][col];
+                }
+                if (tickCount == 5) {
+                    return true;
+                }
+            }
+            let tickCount = 0;
+            for (let i = 0; i < 5; i++) {
+                tickCount += ticks[i][i];
+            }
+            if (tickCount == 5) {
+                return true;
+            }
+            tickCount = 0;
+            for (let i = 0; i < 5; i++) {
+                tickCount += ticks[i][5 - i];
+            }
+            if (tickCount == 5) {
+                return true;
+            }
+            return false;
+        }
+
+        function checkTileRule(ticks, row, col) {
+            let ruleNum = tilemap[row][col]
+            if (ruleNum == 0) {
+                // white
+                return true
+            }
+            if (ruleNum == 1 || ruleNum == 2 || ruleNum == 6 || ruleNum == 7) {
+                // "around" rules
+                let ticksAround = 0;
+                for (let r = row - 1; r <= row + 1; r++) {
+                    for (let c = col - 1; c <= col + 1; c++) {
+                        if (r < 0 || r > 4 || c < 0 || c > 4 || (r == row && c == col)) continue;
+                        ticksAround += ticks[r][c];
+                    }
+                }
+                switch (ruleNum) {
+                    case 1:
+                        return ticksAround >= 1;
+                        break;
+                    case 2:
+                        return ticksAround <= 2;
+                        break;
+                    case 6:
+                        return ticksAround % 2 == 0;
+                        break;
+                    case 7:
+                        return ticksAround % 2 == 1;
+                        break;
+                }
+            }
+            if (ruleNum == 3) {
+                // black (tick this one)
+                return ticks[row][col] == 1
+            }
+            if (ruleNum == 4) {
+                // green (same # on col and row)
+                let colTicks = 0;
+                let rowTicks = 0;
+                for (let r = 0; r < 5; r++) {
+                    colTicks += ticks[r][col]
+                }
+                for (let c = 0; c < 5; c++) {
+                    rowTicks += ticks[row][c]
+                }
+                return rowTicks == colTicks
+            }
+            if (ruleNum == 5) {
+                // yellow (same # on the diagonal)
+                let slashTicks = 0
+                let backSlashTicks = 0
+                for (let i = 0; i < 5; i++) {
+                    if (row - col + i >= 0 && row - col + i <= 4) {
+                        backSlashTicks += ticks[row - col + i][i]
+                    }
+                    if (row + col - i >= 0 && row + col - i <= 4) {
+                        slashTicks += ticks[row + col - i][i]
+                    }
+                }
+                return slashTicks == backSlashTicks
+            }
+            if (ruleNum == 8) {
+                // pink (isolation)
+                if (ticks[row][col] == 0) return true;
+                if (row - 1 >= 0 && ticks[row - 1][col] == 1) return false;
+                if (row + 1 <= 4 && ticks[row + 1][col] == 1) return false;
+                if (col - 1 >= 0 && ticks[row][col - 1] == 1) return false;
+                if (col + 1 <= 4 && ticks[row][col + 1] == 1) return false;
+                return true;
+            }
+            if (ruleNum == 9) {
+                // cyan (anti-isolation)
+                if (ticks[row][col] == 0) return true;
+                if (row - 1 >= 0 && ticks[row - 1][col] == 1) return true;
+                if (row + 1 <= 4 && ticks[row + 1][col] == 1) return true;
+                if (col - 1 >= 0 && ticks[row][col - 1] == 1) return true;
+                if (col + 1 <= 4 && ticks[row][col + 1] == 1) return true;
+                return false;
+            }
+        }
+
+        function validateSolution(ticks) {
+            if (checkFiveInARow(ticks) == false) return false;
+            for (let row = 0; row < 5; row++) {
+                for (let col = 0; col < 5; col++) {
+                    if (checkTileRule(ticks, row, col) == false) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function numberTo5x5Array(number) {
+            // Convert the number to binary and pad it to 25 bits
+            const binaryString = number.toString(2).padStart(25, '0');
+
+            // Initialize the 5x5 array
+            const result = [];
+
+            // Fill the array
+            for (let i = 0; i < 5; i++) {
+                const row = [];
+                for (let j = 0; j < 5; j++) {
+                    // Get the corresponding bit from the binary string
+                    const bitIndex = i * 5 + j;
+                    row.push(parseInt(binaryString[bitIndex]));
+                }
+                result.push(row);
+            }
+
+            return result;
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        function countTheTicks(ticks){
+            let c=0;
+            for(let a of ticks){
+                for(let b of a){
+                    c+=b
+                }
+            }
+            return c
+        }
+        
+        async function dumbStartSolve() {
+            console.log("Solve started")
+            let smallestTicks=99
+            let smallestSolution = []
+            let largestTicks=-1
+            let largestSolution=[]
+            let i = 0
+            let t1=performance.now()
+            let nextTick=50000
+            let tickSize=0
+            for (i = 0; i < 2**25; i++) {
+                let ticks = numberTo5x5Array(i)
+                if (validateSolution(ticks)) {
+                    let solutionTicks=countTheTicks(ticks)
+                    if(solutionTicks<smallestTicks){
+                        smallestTicks=solutionTicks
+                        smallestSolution=ticks
+                    }
+                    if(solutionTicks>largestTicks){
+                        largestTicks=solutionTicks
+                        largestSolution=ticks
+                    }
+                }
+                if (i==nextTick) {
+                    if(tickSize==0){
+                        let t2=performance.now()-t1
+                        tickSize=Math.floor((50000/t2)*1000)
+                    }
+                    nextTick+=tickSize
+                    await sleep(0)
+                    document.getElementById("result").innerHTML=`${i} of ${2**25} (${(i/(2**25)*100).toFixed(2)}% - ETA ${Math.ceil((2**25-nextTick)/tickSize)} more UI updates)`
+                }
+            }
+            if (false) {
+                console.log("not found")
+                document.getElementById("result").innerHTML = "No solution found."
+            } else {
+                console.log("found")
+                document.getElementById("result").innerHTML = ""
+                let p1 = document.createElement("p")
+                p1.innerHTML="Solution with least ticks:"
+                document.getElementById("result").appendChild(p1)
+                let e1 = buildTable(defaultClass = "solutioncell", idPrefix = "", dataTable = smallestSolution)
+                document.getElementById("result").appendChild(e1);
+                let p2 = document.createElement("p")
+                p2.innerHTML="Solution with most ticks:"
+                document.getElementById("result").appendChild(p2)
+                let e2 = buildTable(defaultClass = "solutioncell", idPrefix = "", dataTable = largestSolution)
+                document.getElementById("result").appendChild(e2);
+                
+            }
+        }
+
+        function startSolve() {
+            dumbStartSolve()
+            return
+
+            // performance
+            let tickLength = 0.05
+            let perTickAllowance = 0
+            let initialBatchSize = 10000
+
+            // progress tracking
+            let currentId = 0
+            let pauseAtId = 0
+            let stopAtId = 0 // if hit, no solution is found
+            let currentDirection = 1 // 1 for ticking up, 0 for ticking down
+
+            // solutions go here
+            let smallestId = -1
+            let smallestTicks = []
+            let largestId = -1 // do we even need this?
+            let largestTicks = []
+
+            // task
+            function progressChecker() {
+
+            }
+        }
+    </script>
+    <table>
+        <tr>
+            <td class="selector color0" onclick="selectColor(0)" id="select-color-0"></td>
+            <td class="selector color1" onclick="selectColor(1)" id="select-color-1"></td>
+            <td class="selector color2" onclick="selectColor(2)" id="select-color-2" style="color: white"></td>
+            <td class="selector color3" onclick="selectColor(3)" id="select-color-3" style="color: white"></td>
+            <td class="selector color4" onclick="selectColor(4)" id="select-color-4"></td>
+            <td class="selector color5" onclick="selectColor(5)" id="select-color-5"></td>
+            <td class="selector color6" onclick="selectColor(6)" id="select-color-6"></td>
+            <td class="selector color7" onclick="selectColor(7)" id="select-color-7"></td>
+            <td class="selector color8" onclick="selectColor(8)" id="select-color-8"></td>
+            <td class="selector color9" onclick="selectColor(9)" id="select-color-9"></td>
+        </tr>
+        <tr>
+            <td colspan="10" style="height:6em" id="description">Click a color above to select it.</td>
+        </tr>
+    </table>
+    <script>
+        let mainBingoTableElement = buildTable(defaultClass = "bingocell", idPrefix = "maincell", dataTable = undefined, actionOnClick = true)
+        document.body.appendChild(mainBingoTableElement)
+    </script>
+    <input type="button" value="Solve" onclick="dumbStartSolve()">
+    <p>This brute force script might take a hot while to run. While it's running, the page would likely freeze.</p>
+    <div id="result"></div>
+    <style>
+        table td {
+            border: 2px solid black;
+        }
+
+        table {
+            border-collapse: collapse;
+        }
+
+        .bingocell {
+            width: 4em;
+            height: 4em;
+        }
+
+        .solutioncell {
+            width: 2em;
+            height: 2em;
+            text-align: center;
+        }
+
+        .selector {
+            width: 2em;
+            height: 2em;
+            text-align: center;
+        }
+
+        .color0 {
+            background-color: white;
+        }
+
+        .color1 {
+            background-color: red;
+        }
+
+        .color2 {
+            background-color: blue;
+            color: white;
+        }
+
+        .color3 {
+            background-color: #333333;
+            color: white;
+        }
+
+        .color4 {
+            background-color: green;
+        }
+
+        .color5 {
+            background-color: yellow
+        }
+
+        .color6 {
+            background-color: orange;
+        }
+
+        .color7 {
+            background-color: magenta;
+        }
+
+        .color8 {
+            background-color: pink;
+        }
+        
+        .color9 {
+            background-color: cyan;
+        }
+    </style>
+</body>
